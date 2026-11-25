@@ -4,9 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { supabase } from '../lib/supabase';
-
-type Group = { id: string; name: string };
+import { getCurrentUser, signOut } from '../services/auth';
+import { createGroup, listMyGroups, type Group } from '../services/groups';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -18,45 +17,24 @@ export default function HomeScreen() {
   const [fontsLoaded] = useFonts({ BricolageGrotesque_700Bold, Onest_400Regular, Onest_500Medium });
 
   const loadGroups = useCallback(async () => {
-    const { data, error } = await supabase.from('groups').select('id, name').order('created_at', { ascending: false });
-    if (!error && data) setGroups(data as Group[]);
+    setGroups(await listMyGroups());
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    getCurrentUser().then((user) => setEmail(user?.email ?? null));
     loadGroups();
   }, [loadGroups]);
 
-  async function createGroup() {
+  async function handleCreateGroup() {
     if (!groupName.trim()) {
       Alert.alert('Eksik bilgi', 'Grup adı gerekli.');
       return;
     }
     setLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-
-    // 1. Grubu oluştur
-    const { data: group, error: groupError } = await supabase
-      .from('groups')
-      .insert({ name: groupName.trim(), created_by: uid })
-      .select()
-      .single();
-
-    if (groupError || !group) {
-      setLoading(false);
-      Alert.alert('Hata', groupError?.message ?? 'Grup oluşturulamadı.');
-      return;
-    }
-
-    // 2. Kendini gruba üye ekle
-    const { error: memberError } = await supabase
-      .from('group_members')
-      .insert({ group_id: group.id, user_id: uid });
-
+    const { error } = await createGroup(groupName);
     setLoading(false);
-    if (memberError) {
-      Alert.alert('Hata', memberError.message);
+    if (error) {
+      Alert.alert('Hata', error);
       return;
     }
     setGroupName('');
@@ -64,7 +42,7 @@ export default function HomeScreen() {
   }
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await signOut();
     router.replace('/');
   }
 
@@ -87,7 +65,7 @@ export default function HomeScreen() {
             placeholder="Örn: Büyükada '25"
             placeholderTextColor="#6a5a72"
           />
-          <Pressable style={styles.addBtn} onPress={createGroup} disabled={loading}>
+          <Pressable style={styles.addBtn} onPress={handleCreateGroup} disabled={loading}>
             <Text style={styles.addBtnText}>{loading ? '...' : 'Oluştur'}</Text>
           </Pressable>
         </View>
