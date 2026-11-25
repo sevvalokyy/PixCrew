@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { signIn, signUp } from '../services/auth';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -26,10 +26,10 @@ export default function AuthScreen() {
       return;
     }
     if (isSignup) {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await signUp(email, password);
       if (error) { Alert.alert('Kayıt olunamadı', error.message); return; }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await signIn(email, password);
       if (error) { Alert.alert('Giriş yapılamadı', error.message); return; }
     }
     router.replace('/home');
